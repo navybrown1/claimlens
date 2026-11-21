@@ -56,7 +56,7 @@ export default function IntelligencePage({ report, claims, onReview, onAnalyze, 
       <div className="intelligence-metrics">
         <div><span>Claims screened</span><strong>{report.scanned.toLocaleString()}</strong><small>Entire current run</small></div>
         <div><span>Claims with signals</span><strong>{report.flagged.toLocaleString()}</strong><small>Review leads, not fraud findings</small></div>
-        <div><span>Higher-priority combinations</span><strong>{report.high.toLocaleString()}</strong><small>Multiple weighted signals</small></div>
+        <div><span>Higher-priority findings</span><strong>{report.high.toLocaleString()}</strong><small>High-severity or combined signals</small></div>
         <div><span>Evidence signals</span><strong>{report.signalCount.toLocaleString()}</strong><small>Patterns can overlap</small></div>
       </div>
       <div className="intelligence-two-columns">
