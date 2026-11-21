@@ -531,7 +531,7 @@ describe("frontend client", () => {
     model: "gpt-6-luna",
     apiKey: KEY,
   };
-  it("only contacts its own API route with no cookies or caching", async () => {
+  it("contacts its same-origin API with deployment authentication and no caching", async () => {
     vi.stubGlobal(
       "fetch",
       vi
