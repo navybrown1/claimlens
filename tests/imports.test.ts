@@ -333,19 +333,22 @@ describe("September-style source export compatibility", () => {
       "claim_id,employee_id,expense_date,submit_date,category,merchant,amount_usd,receipt_attached,nights,fare_class,preapproval_id,attendees,description",
       "TEST-1,E-101,2026-09-15,2026-09-16,Hotel,Example Hotel,425.50,Y,2,,AP-1,,Work visit",
       "TEST-2,E-999,2026-09-31,2026-10-01,Meals,Example Cafe,24.50,, ,,,3,Staff meal",
+      "TEST-3,E-101,2026-09-10,2026-09-11,Airfare,Example Airlines,-42.50,N,,,,Refund posted",
     ].join("\n");
     const result = parseClaimsText(claimsFile);
     expect(result.errors).toEqual([]);
-    expect(result.data).toHaveLength(2);
+    expect(result.data).toHaveLength(3);
     expect(result.data[0]).toMatchObject({
       id: "TEST-1", employeeId: "E-101", amount: 425.5,
       submittedDate: "2026-09-16", nights: 2, preapprovalId: "AP-1",
     });
     expect(result.data[1]).toMatchObject({ date: "2026-09-31", attendees: 3, receipt: false });
+    expect(result.data[2].amount).toBe(-42.50);
     expect(result.warnings.join(" ")).toContain("invalid expense dates");
     const audited = auditClaims(result.data, roster.data, DEFAULT_POLICY, [], new Date("2026-11-20T12:00:00Z"));
     expect(audited[0].findings.some((finding) => finding.code === "unverified-employee-status")).toBe(true);
     expect(audited[1].findings.some((finding) => finding.code === "unknown-employee")).toBe(true);
     expect(audited[1].findings.some((finding) => finding.code === "invalid-date")).toBe(true);
+    expect(audited[2].findings.some((finding) => finding.code === "credit-adjustment")).toBe(true);
   });
 });
