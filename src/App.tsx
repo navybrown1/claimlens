@@ -2786,7 +2786,7 @@ export default function App() {
             />
             <UploadZone
               title="Employee roster"
-              text="Employee IDs, departments, and active status."
+              text="Employee IDs, departments, and optional names and status."
               accept=".csv,.xlsx,.json"
               icon={Users}
               onFile={(f) => void importFile(f, "employees")}
@@ -3135,6 +3135,11 @@ export default function App() {
               ["Submitted", current.submittedDate],
               ["Receipt", current.receipt ? "Provided" : "Not provided"],
               ["Employee ID", current.employeeId],
+              ...(current.nights ? [["Hotel nights", String(current.nights)]] : []),
+              ...(current.fareClass ? [["Fare class", current.fareClass]] : []),
+              ...(current.preapprovalId ? [["Preapproval reference", current.preapprovalId]] : []),
+              ...(current.attendees ? [["Attendees", String(current.attendees)]] : []),
+              ...(() => { const record = workspace.employees.find((employee) => employee.id === current.employeeId); return record ? [["Roster status", record.status === "unknown" ? "Unverified" : record.status], ...(record.office ? [["Office", record.office]] : []), ...(record.level ? [["Level", record.level]] : []), ...(record.costCenter ? [["Cost center", record.costCenter]] : [])] : []; })(),
             ].map(([label, value]) => (
               <div className="detail-item" key={label}>
                 <span>{label}</span>
