@@ -8,7 +8,7 @@ ClaimLens is an expense review workspace that turns exports into an organized qu
 
 [Open ClaimLens](https://claimlens-iota.vercel.app) · [Source repository](https://github.com/navybrown1/claimlens) · [AI setup and implementation details](docs/AI_SETUP.md)
 
-![ClaimLens dashboard with fictional demo expenses](docs/screenshots/overview.jpg)
+[View the previous dashboard design reference](docs/screenshots/overview.jpg) (image from an earlier fictional prototype; no fictional data loads in the current app)
 
 ## What you can do
 
@@ -20,17 +20,20 @@ ClaimLens is an expense review workspace that turns exports into an organized qu
 - Adjust the example policy and rerun the checks.
 - Save up to **12 audit snapshots** in this browser and download portable JSON backups or spreadsheet-ready CSV reports.
 - Use **OpenRouter, OpenAI, Anthropic, or Google Gemini** for summaries, questions, explanations, follow-up drafts, and receipt extraction.
+- Open **Intelligence** to screen **every imported claim** for robust spending outliers, near-duplicate vendors/amounts, repeated merchant activity, clustered sub-limit charges, and employee spend concentration. Search, filter, inspect evidence, and export findings as CSV.
+- Select **Investigate signals with AI** to review the aggregated full-run anomaly results plus up to 60 top-priority claim excerpts, only after connecting a model. [Screening methodology and safeguards](docs/INTELLIGENCE.md).
 
 The initial workspace has **zero sample claims and zero sample employees**. Import your own files; demo snapshots from previous versions are cleared when the app loads.
 
 ## Your first audit
 
 1. Open **Import data** and download the claims and employee templates if needed.
-2. Import the claims export and employee roster. Importing either into the demo clears the other demo dataset, so fictional employees cannot silently validate real claims. Either import order works.
+2. Import the claims export and employee roster in either order. Existing unsaved imports are replaced when new claims are loaded; no fictional roster is mixed with your records.
 3. Optionally load a previous ClaimLens JSON backup for duplicate comparison. Impossible expense dates are preserved for manual correction rather than dropped.
 4. Open **Policy settings**, enter your organization's actual rules, and save.
-5. Open **Review claims**. Read each finding, compare it with the source evidence, and record a decision or follow-up note.
-6. Choose **Save audit**. In **Audit history**, download a JSON backup for a durable copy or export the review CSV from the claims view. To reopen a backup on another session, use **Import data → Restore complete audit backup** and select its JSON file.
+5. Open **Intelligence** to screen the entire claim batch for outliers and recurring patterns. Review each signal and related claim. Optionally ask the AI copilot to interpret a bounded set of prioritized evidence.
+6. Open **Review claims**. Read each finding, compare it with the source evidence, and record a decision or follow-up note.
+7. Choose **Save audit**. In **Audit history**, download a JSON backup for a durable copy or export the review CSV from the claims view. To reopen a backup on another session, use **Import data → Restore complete audit backup** and select its JSON file.
 
 New claim imports replace the current session's claims and decisions. Policy, roster, and historical-comparison changes can invalidate earlier review decisions. Save a snapshot before replacing data you want to keep.
 
