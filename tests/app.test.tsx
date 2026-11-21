@@ -284,6 +284,39 @@ describe("ClaimLens user workflows", () => {
     expect(within(credit).getByText("Employment status unverified")).toBeTruthy();
   });
 
+  it("shows the Intelligence workspace with explainable patterns, and opens the claim review", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const day1 = day(4);
+    const day2 = day(3);
+    const run: SavedRun = {
+      id: "intelligence-run",
+      name: "Synthetic review",
+      createdAt: new Date().toISOString(),
+      claims: [
+        { ...expense(), id: "INT-1", amount: 40, category: "Meals", merchant: "Team Cafe", date: day1 },
+        { ...expense(), id: "INT-2", amount: 45, category: "Meals", merchant: "Team Cafe", date: day2 },
+      ],
+      employees,
+      policy: { ...DEFAULT_POLICY },
+      decisions: {},
+      events: [],
+    };
+    const dialog = await openImport(user);
+    await user.upload(within(dialog).getByTestId("restore-audit-file"), file("synthetic.json", JSON.stringify(run), "application/json"));
+    await screen.findByRole("heading", { name: "Every expense, in focus." });
+    await user.click(navigation(/^Intelligence/));
+    expect(screen.getByRole("heading", { name: "Find the unusual." })).toBeTruthy();
+    expect(screen.getByText("2", { selector: ".intelligence-metrics strong" })).toBeTruthy();
+    expect(screen.getAllByText("Grouped charges above review limit").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Connect AI to investigate/ })).toBeTruthy();
+    await user.click(screen.getAllByRole("button", { name: /^Review/ })[0]);
+    const review = screen.getByRole("dialog", { name: /^Review INT-/ });
+    expect(within(review).getByText(/Behavioral screening/)).toBeTruthy();
+    expect(within(review).getByText("Grouped charges above review limit")).toBeTruthy();
+    expect(within(review).getByText(/not a fraud score/)).toBeTruthy();
+  });
+
   it("keeps API keys out of saved audits, clears them when providers change, and forgets them on reload", async () => {
     const user = userEvent.setup();
     const app = render(<App />);
