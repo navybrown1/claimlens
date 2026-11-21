@@ -28,9 +28,11 @@ No custom provider URL is accepted. OpenRouter allows namespaced `provider/model
 
 ## What is sent
 
-A normal copilot chat request sends the typed question, up to six recent user/assistant messages (each capped at 1,500 characters), selected policy values, full-run counts and separate totals for each currency, plus at most 60 individual claims. Claim details are ordered by rule-based risk, with the selected claim first when applicable. The context explicitly states how many claims were omitted.
+A normal copilot chat request sends the typed question, up to six recent user/assistant messages (each capped at 1,500 characters), selected policy values, full-run counts and separate totals for each currency, plus at most 60 individual claims. Claim details are ordered by the strongest combined rule-based and locally computed behavioral review signals, with the selected claim first when applicable. The context explicitly states how many claims were omitted. The entire batch is screened locally, but the model receives at most 60 detailed claim records per request.
 
 Included individual claim fields are claim ID, a generated employee reference such as `Employee 1`, department, merchant, category, dates, amount, currency, receipt-present flag, mileage when supplied, rule-based status/score, and concise rule findings. The original employee name and employee ID fields, free-text descriptions, reviewer notes, and review decisions are excluded. A second server-side allowlist applies the same boundary. This is data minimization, not a guarantee of anonymity: merchant names, claim IDs, departments, and the text a person types can still contain sensitive information.
+
+When the Intelligence engine has run, the client also sends aggregated whole-run anomaly counts and pattern categories, plus at most four bounded behavioral signal explanations for each included claim. These signals compare amounts, near matches, and repeat activity. They are screening heuristics, not calibrated probabilities of fraud. The model is instructed to use the full-run totals only for aggregate statements and never to imply that it inspected an excluded individual claim. See [Intelligence methodology](INTELLIGENCE.md).
 
 A connection test does not send claim data. Receipt extraction sends the selected image to the selected provider. Images can contain names and other personal details, so inspect or crop the image before requesting extraction. ClaimLens does not upload images until extraction is requested.
 
