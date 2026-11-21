@@ -245,13 +245,10 @@ export function auditClaims(
           "medium",
         );
     }
-    if (!Number.isFinite(claim.amount) || claim.amount <= 0)
-      add(
-        "invalid-amount",
-        "Invalid expense amount",
-        "The amount must be a finite, positive number. Credits should be reconciled separately.",
-        "high",
-      );
+    if (!Number.isFinite(claim.amount) || claim.amount === 0)
+      add("invalid-amount", "Invalid expense amount", "Amounts must be finite and nonzero.", "high");
+    if (Number.isFinite(claim.amount) && claim.amount < 0)
+      add("credit-adjustment", "Credit or refund adjustment", "This is a negative-value adjustment, not a positive reimbursement. Match it to the original charge before reconciling the net total.", "medium");
     if (!sameCurrency)
       add(
         "currency",
@@ -261,6 +258,7 @@ export function auditClaims(
       );
     if (
       !claim.receipt &&
+      claim.amount > 0 &&
       (!sameCurrency || claim.amount >= policy.receiptThreshold)
     )
       add(
