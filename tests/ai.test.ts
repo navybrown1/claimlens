@@ -113,6 +113,7 @@ function mockOpenAI(text = "Review CL-001 for its missing receipt.") {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
@@ -577,5 +578,46 @@ describe("frontend client", () => {
       requestAI({ ...config, apiKey: "" }, { action: "test" }),
     ).rejects.toThrow("Add your API key");
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("OpenRouter integration", () => {
+  it("routes namespaced models to the official chat endpoint without leaking an API key", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: "Review CL-001." } }] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", mockFetch);
+    const result = await invoke({ ...validBody, provider: "openrouter", model: "openai/gpt-4o-mini" });
+    expect(result.status).toBe(200);
+    expect(result.body.text).toBe("Review CL-001.");
+    const [url, request] = mockFetch.mock.calls[0];
+    expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
+    expect(request.headers.Authorization).toBe(`Bearer ${KEY}`);
+    const payload = JSON.parse(request.body);
+    expect(payload.model).toBe("openai/gpt-4o-mini");
+    expect(payload.messages[0].role).toBe("system");
+    expect(JSON.stringify(result.body)).not.toContain(KEY);
+  });
+  it("never spends a server key when no separate workspace access token is configured", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "sk-or-example-not-real");
+    vi.stubEnv("CLAIMLENS_ACCESS_TOKEN", "");
+    const mockFetch = vi.fn();
+    vi.stubGlobal("fetch", mockFetch);
+    const result = await invoke({ ...validBody, provider: "openrouter", model: "openai/gpt-4o-mini", apiKey: "", useServerKey: true, accessToken: "wrong" });
+    expect(result.status).toBe(503);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+  it("requires the right private access code before using the Vercel secret", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "sk-or-example-not-real");
+    vi.stubEnv("CLAIMLENS_ACCESS_TOKEN", "test-private-access-code-not-real");
+    const mockFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "ClaimLens connection successful." } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", mockFetch);
+    const invalid = await invoke({ ...validBody, provider: "openrouter", model: "openai/gpt-4o-mini", action: "test", apiKey: "", useServerKey: true, accessToken: "wrong" });
+    expect(invalid.status).toBe(401);
+    expect(mockFetch).not.toHaveBeenCalled();
+    const valid = await invoke({ ...validBody, provider: "openrouter", model: "openai/gpt-4o-mini", action: "test", apiKey: "", useServerKey: true, accessToken: "test-private-access-code-not-real" });
+    expect(valid.status).toBe(200);
+    expect(mockFetch.mock.calls[0][1].headers.Authorization).toBe("Bearer sk-or-example-not-real");
+    expect(JSON.stringify(valid.body)).not.toContain("sk-or-example");
   });
 });
