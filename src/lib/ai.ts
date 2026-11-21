@@ -1,4 +1,5 @@
 import type { AIConfig, AIProvider, AuditedClaim, Policy } from "../types";
+import type { AnomalyReport } from "./anomalies";
 
 export type AIAction =
   "chat" | "test" | "summary" | "explain" | "draft" | "receipt";
@@ -137,11 +138,14 @@ export function buildAIContext(
   claims: AuditedClaim[],
   policy: Policy,
   selectedId?: string,
+  anomalyReport?: AnomalyReport,
 ) {
+  const anomalyById = new Map(anomalyReport?.items.map((item) => [item.claimId, item]) ?? []);
+  const importance = (claim: AuditedClaim) => Math.max(claim.riskScore * 0.65, (anomalyById.get(claim.id)?.score ?? 0) * 1.05);
   const ordered = [...claims].sort((a, b) => {
     if (a.id === selectedId) return -1;
     if (b.id === selectedId) return 1;
-    return b.riskScore - a.riskScore || a.id.localeCompare(b.id);
+    return importance(b) - importance(a) || a.id.localeCompare(b.id);
   });
   const selected = ordered.slice(0, 60);
   const employees = new Map<string, string>();
@@ -163,8 +167,16 @@ export function buildAIContext(
     omittedClaims: Math.max(0, claims.length - selected.length),
     selection: selectedId
       ? "Selected claim first, then highest rule-based risk"
-      : "Highest rule-based risk first",
+      : anomalyReport ? "Highest rule-based and behavioral-review priority first" : "Highest rule-based risk first",
     selectedClaimId: selectedId ?? null,
+    ...(anomalyReport ? { anomalySummary: {
+      scanned: anomalyReport.scanned,
+      flagged: anomalyReport.flagged,
+      high: anomalyReport.high,
+      medium: anomalyReport.medium,
+      signalCount: anomalyReport.signalCount,
+      patterns: anomalyReport.patterns.slice(0, 12).map((p) => ({ code: p.code, title: p.title, count: p.count })),
+    } } : {}),
     summary: {
       amountsByCurrency,
       hold: claims.filter((c) => c.status === "hold").length,
@@ -197,6 +209,16 @@ export function buildAIContext(
       ...(claim.mileage !== undefined ? { mileage: claim.mileage } : {}),
       status: claim.status,
       riskScore: claim.riskScore,
+      ...(anomalyById.has(claim.id) ? {
+        anomalyScore: anomalyById.get(claim.id)!.score,
+        anomalySignals: anomalyById.get(claim.id)!.signals.slice(0, 4).map((signal) => ({
+          code: signal.code,
+          title: signal.title,
+          severity: signal.severity,
+          explanation: signal.explanation.slice(0, 180),
+          relatedIds: signal.relatedIds.slice(0, 6),
+        })),
+      } : {}),
       findings: claim.findings.map((finding) => ({
         code: finding.code,
         title: finding.title,
@@ -207,6 +229,6 @@ export function buildAIContext(
       })),
     })),
     limitations:
-      "Rule findings are review signals, not proof of fraud. Employee names, original employee IDs, descriptions, reviewer notes, and decision history are excluded. Amounts in different currencies are not converted or combined. Only the included claims can be inspected individually. No approval or payment actions are available.",
+      "Rule findings are review signals, not proof of fraud. Employee names, original employee IDs, descriptions, reviewer notes, and decision history are excluded. Amounts in different currencies are not converted or combined. Only the included claims can be inspected individually. Behavioral signals were computed locally across the full run and are screening heuristics, not trained fraud probabilities or proof of wrongdoing. No approval or payment actions are available.",
   };
 }
