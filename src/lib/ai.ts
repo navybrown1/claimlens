@@ -79,7 +79,7 @@ export async function requestAI(
     const response = await fetch("/api/ai", {
       method: "POST",
       mode: "same-origin",
-      credentials: "omit",
+      credentials: "same-origin",
       cache: "no-store",
       referrerPolicy: "no-referrer",
       headers: { "Content-Type": "application/json" },
