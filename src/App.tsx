@@ -66,6 +66,8 @@ import type {
   Workspace,
 } from "./types";
 import { auditClaims, DEFAULT_POLICY } from "./lib/audit";
+import { detectAnomalies, anomaliesToCSV } from "./lib/anomalies";
+import IntelligencePage from "./IntelligencePage";
 import { parseClaimsFile, parseEmployeesFile } from "./lib/imports";
 import {
   claimsToCSV,
@@ -79,7 +81,7 @@ import { PROVIDERS, buildAIContext, requestAI } from "./lib/ai";
 import { getSavedRuns, putSavedRuns } from "./lib/storage";
 
 type Page =
-  "overview" | "claims" | "departments" | "copilot" | "history" | "settings";
+  "overview" | "claims" | "intelligence" | "departments" | "copilot" | "history" | "settings";
 type Modal = "import" | "add" | "receipt" | "help" | "reset" | null;
 interface Message {
   id: string;
@@ -142,6 +144,7 @@ const categories = [
 const nav = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "claims", label: "Review claims", icon: ReceiptText },
+  { id: "intelligence", label: "Intelligence", icon: Activity },
   { id: "departments", label: "Departments", icon: Building2 },
   { id: "copilot", label: "AI copilot", icon: Sparkles },
   { id: "history", label: "Audit history", icon: FolderClock },
@@ -415,6 +418,14 @@ export default function App() {
       ),
     [workspace.claims, workspace.employees, workspace.policy, historyClaims],
   );
+  const anomalyReport = useMemo(
+    () => detectAnomalies(audited, workspace.policy),
+    [audited, workspace.policy],
+  );
+  const anomaliesById = useMemo(
+    () => new Map(anomalyReport.items.map((item) => [item.claimId, item])),
+    [anomalyReport],
+  );
   const base = workspace.policy.baseCurrency;
   const baseClaims = audited.filter((c) => c.currency === base);
   const total = baseClaims.reduce((n, c) => n + c.amount, 0);
@@ -439,6 +450,7 @@ export default function App() {
     ...new Set(audited.map((c) => c.department || "Unassigned")),
   ].sort();
   const current = audited.find((c) => c.id === detail);
+  const currentAnomaly = detail ? anomaliesById.get(detail) : undefined;
   const filtered = useMemo(() => {
     const query = search.toLowerCase().trim();
     return audited
@@ -778,7 +790,7 @@ export default function App() {
       const result = await requestAI(activeConfig, {
         action,
         prompt: text,
-        context: buildAIContext(audited, workspace.policy, claimId),
+        context: buildAIContext(audited, workspace.policy, claimId, anomalyReport),
         conversation,
       });
       if (
@@ -1052,7 +1064,7 @@ export default function App() {
                 <small className="cell-subtitle">{c.category}</small>
               </td>
               <td className="amount">{currencyText(c.amount, c.currency)}</td>
-              <td>{badgeStatus(c)}</td>
+              <td>{badgeStatus(c)}{anomaliesById.has(c.id) && <span className="intelligence-claim-mark">Pattern signal</span>}</td>
               {!compact && (
                 <>
                   <td>
@@ -1126,7 +1138,7 @@ export default function App() {
         </button>
         <span className="sidebar-section">WORKSPACE</span>
         <nav aria-label="Main navigation">
-          {nav.slice(0, 4).map((n) => (
+          {nav.slice(0, 5).map((n) => (
             <button
               key={n.id}
               className={`nav-item ${page === n.id ? "active" : ""}`}
@@ -1138,12 +1150,13 @@ export default function App() {
                 <span className="nav-count">{pending.length}</span>
               )}
               {n.id === "copilot" && <span className="nav-ai">AI</span>}
+              {n.id === "intelligence" && anomalyReport.flagged > 0 && <span className="nav-count">{anomalyReport.flagged}</span>}
             </button>
           ))}
         </nav>
         <span className="sidebar-section">MANAGE</span>
         <nav aria-label="Audit management">
-          {nav.slice(4).map((n) => (
+          {nav.slice(5).map((n) => (
             <button
               key={n.id}
               className={`nav-item ${page === n.id ? "active" : ""}`}
@@ -1234,6 +1247,7 @@ export default function App() {
                   {
                     overview: "Every expense, in focus.",
                     claims: "The review queue.",
+                    intelligence: "Find the unusual.",
                     departments: "See the bigger picture.",
                     copilot: "Meet your second set of eyes.",
                     history: "A record of every review.",
@@ -1247,6 +1261,8 @@ export default function App() {
                     overview: `Good to see you, Edwin. Here’s where your expenses stand.`,
                     claims:
                       "Investigate exceptions, document decisions, and move your audit forward.",
+                    intelligence:
+                      "Screen all claims for spending outliers, near matches, and unusual repeat activity.",
                     departments:
                       "Understand where expenses go and where attention is needed.",
                     copilot:
@@ -1624,6 +1640,38 @@ export default function App() {
                 </div>
               </div>
             </>
+          )}
+          {page === "intelligence" && (
+            <IntelligencePage
+              report={anomalyReport}
+              claims={audited}
+              canUseAI={canUseAI}
+              busy={aiBusy}
+              onConnect={() => go("copilot")}
+              onAnalyze={() => void sendAI(
+                "Analyze the full-run behavioral screening summary and the prioritized claim evidence. Begin with exact full-run counts. Cite specific claim IDs from the included subset, compare legitimate explanations, and give practical next verification steps. Do not infer misconduct. Detailed records are limited to 60 prioritized claims.",
+                "chat",
+              )}
+              onExport={() => {
+                downloadFile(
+                  "claimlens-intelligence-" + localISODate() + ".csv",
+                  anomaliesToCSV(anomalyReport, audited),
+                  "text/csv;charset=utf-8;",
+                );
+                toast("Exported " + anomalyReport.flagged + " flagged claims with evidence.");
+              }}
+              onReview={(id) => setDetail(id)}
+            />
+          )}
+          {page === "overview" && audited.length > 0 && (
+            <section className="panel intelligence-overview-strip">
+              <div>
+                <span className="intelligence-eyebrow">FULL-RUN BEHAVIORAL SCREENING</span>
+                <h3>{anomalyReport.flagged} claims show patterns worth checking</h3>
+                <p>{anomalyReport.scanned.toLocaleString()} claims screened locally across spending, similar charges, and repeat activity. Findings are review leads, not proof of fraud.</p>
+              </div>
+              <button className="button secondary" onClick={() => go("intelligence")}>Open Intelligence <ArrowRight size={16}/></button>
+            </section>
           )}
           {page === "claims" && (
             <>
@@ -3170,6 +3218,21 @@ export default function App() {
             <span className="field-label">Business purpose</span>
             <p>{current.description || "No business purpose supplied."}</p>
           </div>
+          {currentAnomaly && (
+            <section className="anomaly-detail-section" aria-label="Behavioral review signals">
+              <h3>Behavioral screening · {currentAnomaly.signals.length} signal{currentAnomaly.signals.length === 1 ? "" : "s"}</h3>
+              <p>Based on this full audit's observed patterns. These are leads for review, not a fraud score.</p>
+              {currentAnomaly.signals.map((signal) => (
+                <div key={signal.code} className="anomaly-detail-signal">
+                  <strong>{signal.title}</strong>
+                  <p>{signal.explanation}</p>
+                  {signal.relatedIds.length > 0 && <div>Related: {signal.relatedIds.map((id) => (
+                    <button type="button" className="text-button" key={id} onClick={() => setDetail(id)}>{id}</button>
+                  ))}</div>}
+                </div>
+              ))}
+            </section>
+          )}
           <div className="section-heading">
             <h3>
               {current.findings.length
