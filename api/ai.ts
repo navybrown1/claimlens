@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createHash, timingSafeEqual } from "node:crypto";
 
-type Provider = "openai" | "anthropic" | "gemini";
+type Provider = "openai" | "anthropic" | "gemini" | "openrouter";
 type Action = "chat" | "test" | "summary" | "explain" | "draft" | "receipt";
 type JsonRecord = Record<string, unknown>;
 type APIRequest = IncomingMessage & { body?: unknown };
@@ -27,7 +28,7 @@ export const config = { maxDuration: 60 };
 export const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
 const MAX_BODY_BYTES = 3.6 * 1024 * 1024;
 const MAX_CONTEXT_BYTES = 100_000;
-const ALLOWED_PROVIDERS = new Set<Provider>(["openai", "anthropic", "gemini"]);
+const ALLOWED_PROVIDERS = new Set<Provider>(["openai", "anthropic", "gemini", "openrouter"]);
 const ALLOWED_ACTIONS = new Set<Action>([
   "chat",
   "test",
@@ -40,6 +41,7 @@ const PROVIDER_DEFAULTS: Record<Provider, string> = {
   openai: "gpt-6-luna",
   anthropic: "claude-haiku-5-5",
   gemini: "gemini-3.5-flash-lite",
+  openrouter: "openai/gpt-4o-mini",
 };
 
 class RequestError extends Error {
@@ -261,22 +263,35 @@ function validateInput(raw: unknown): ValidInput {
   const body = record(raw);
   if (!body) throw new RequestError(400, "Invalid request.");
   if (!ALLOWED_PROVIDERS.has(body.provider as Provider))
-    throw new RequestError(400, "Choose OpenAI, Anthropic, or Google Gemini.");
+    throw new RequestError(400, "Choose OpenAI, Anthropic, Gemini, or OpenRouter.");
   if (!ALLOWED_ACTIONS.has(body.action as Action))
     throw new RequestError(400, "Choose a supported AI action.");
-  const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
-  if (
-    apiKey.length < 8 ||
-    apiKey.length > 4096 ||
-    /\s|[\u0000-\u001f\u007f]/.test(apiKey)
-  )
-    throw new RequestError(400, "Enter a valid API key in AI settings.");
   const provider = body.provider as Provider;
+  const useServerKey = provider === "openrouter" && body.useServerKey === true;
+  if (body.useServerKey === true && provider !== "openrouter")
+    throw new RequestError(400, "A server key is only available for OpenRouter.");
+  let apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+  if (useServerKey) {
+    const expected = process.env.CLAIMLENS_ACCESS_TOKEN || "";
+    const supplied = typeof body.accessToken === "string" ? body.accessToken : "";
+    const serverKey = process.env.OPENROUTER_API_KEY || "";
+    if (!expected || !serverKey)
+      throw new RequestError(503, "Server OpenRouter key or access code not configured. Use a personal key instead.");
+    if (!supplied || supplied.length > 256)
+      throw new RequestError(401, "Invalid workspace access code.");
+    const a = createHash("sha256").update(supplied).digest();
+    const b = createHash("sha256").update(expected).digest();
+    if (!timingSafeEqual(a, b))
+      throw new RequestError(401, "Invalid workspace access code.");
+    apiKey = serverKey;
+  }
+  if (apiKey.length < 8 || apiKey.length > 4096 || /\s|[\u0000-\u001f\u007f]/.test(apiKey))
+    throw new RequestError(400, "Enter a valid API key in AI settings.");
   const model =
     typeof body.model === "string"
       ? body.model.trim()
       : PROVIDER_DEFAULTS[provider];
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,119}$/.test(model))
+  if (!(provider === "openrouter" ? /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,119}$/ : /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,119}$/).test(model))
     throw new RequestError(400, "Enter a valid model ID in AI settings.");
   if (
     body.prompt !== undefined &&
@@ -427,6 +442,21 @@ function providerRequest(input: ValidInput): {
       },
     };
   }
+  if (input.provider === "openrouter") {
+    return {
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      headers: { Authorization: `Bearer ${input.apiKey}`, "Content-Type": "application/json" },
+      body: {
+        model: input.model, max_tokens: maxTokens,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: input.image
+            ? [{ type: "text", text }, { type: "image_url", image_url: { url: `data:${input.image.mimeType};base64,${input.image.data}` } }]
+            : text },
+        ],
+      },
+    };
+  }
   if (input.provider === "anthropic") {
     return {
       url: "https://api.anthropic.com/v1/messages",
@@ -510,6 +540,13 @@ function extractText(provider: Provider, payload: unknown): string {
         );
       })
       .join("\n");
+  }
+  if (provider === "openrouter") {
+    const choice = record(Array.isArray(result.choices) ? result.choices[0] : null);
+    const message = record(choice?.message);
+    if (typeof message?.content === "string") return message.content;
+    return (Array.isArray(message?.content) ? message.content : [])
+      .flatMap((part) => { const p = record(part); return p?.type === "text" && typeof p.text === "string" ? [p.text] : []; }).join("\n");
   }
   if (provider === "anthropic")
     return (Array.isArray(result.content) ? result.content : [])
