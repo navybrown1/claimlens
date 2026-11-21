@@ -111,7 +111,7 @@ The app's imports, rules, decisions, analytics, and backups work without an API 
 
 Official setup guides: [OpenAI](https://developers.openai.com/api/docs/quickstart), [Anthropic](https://platform.claude.com/docs/en/api/overview), and [Google Gemini](https://aistudio.google.com/docs/api-key). See [AI_SETUP.md](docs/AI_SETUP.md) for request details, supported models, provider references, and troubleshooting.
 
-**The API key exists only in the current tab's memory.** Refreshing or disconnecting clears it. ClaimLens does not save it to browser storage, audit exports, a database, or the repository. Requests pass through the app's server function to the selected provider; the application does not embed a shared provider key.
+**Directly entered provider keys and private workspace access codes exist only in the current tab's memory.** Refreshing or disconnecting clears them. ClaimLens does not save them in browser storage, audit exports, or GitHub. Requests pass through the server function to the selected provider. An optional OpenRouter server key may be stored separately in Vercel and requires a distinct access code.
 
 The copilot receives full-run counts and separate currency totals, plus up to **60 claims**, ordered by priority with a selected claim first. Employee names, original employee IDs, descriptions, reviewer notes, and decisions are excluded from the structured audit context. Chat also includes your question and up to six recent messages. Text you type can still contain personal information.
 
