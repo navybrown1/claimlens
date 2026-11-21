@@ -146,11 +146,12 @@ describe("claim imports", () => {
         .data,
     ).toHaveLength(2);
   });
-  it("requires explicit employee status and rejects duplicate roster IDs", async () => {
+  it("preserves roster IDs when status is unknown and rejects duplicate roster IDs", async () => {
     const missing = await parseEmployeesFile(
       file("id,name,department\nE-1,Jamie,Sales", "staff.csv"),
     );
-    expect(missing.data).toHaveLength(0);
+    expect(missing.data).toHaveLength(1);
+    expect(missing.data[0].status).toBe("unknown");
     const repeated = await parseEmployeesFile(
       file("id,name,status\nE-1,Jamie,active\nE-1,Alex,inactive", "staff.csv"),
     );
