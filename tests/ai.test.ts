@@ -542,7 +542,7 @@ describe("frontend client", () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(url).toBe("/api/ai");
     expect(init?.mode).toBe("same-origin");
-    expect(init?.credentials).toBe("omit");
+    expect(init?.credentials).toBe("same-origin");
     expect(init?.cache).toBe("no-store");
   });
   it("sends only the most recent six messages, with bounded text", async () => {
