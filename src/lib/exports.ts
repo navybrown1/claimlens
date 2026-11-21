@@ -256,7 +256,7 @@ function validateClaimList(input: unknown, label: string): Claim[] {
         `The ${label} contains an invalid receipt flag or amount.`,
       );
     if (
-      parseDate(c.date) !== c.date ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(c.date) ||
       !c.date ||
       (c.submittedDate && parseDate(c.submittedDate) !== c.submittedDate) ||
       !/^[A-Z]{3}$/.test(c.currency)
@@ -284,6 +284,10 @@ function validateClaimList(input: unknown, label: string): Claim[] {
       receipt: c.receipt,
       description: c.description,
       ...(c.mileage !== undefined ? { mileage: c.mileage } : {}),
+      ...(Number.isSafeInteger(c.nights) && (c.nights ?? 0) > 0 && (c.nights ?? 0) < 10000 ? { nights: c.nights } : {}),
+      ...(Number.isSafeInteger(c.attendees) && (c.attendees ?? 0) > 0 && (c.attendees ?? 0) < 10000 ? { attendees: c.attendees } : {}),
+      ...(typeof c.fareClass === "string" ? { fareClass: c.fareClass.slice(0,100) } : {}),
+      ...(typeof c.preapprovalId === "string" ? { preapprovalId: c.preapprovalId.slice(0,120) } : {}),
     };
   });
 }
@@ -330,7 +334,7 @@ export function validateSavedRun(raw: unknown): SavedRun {
       item.name.length > 200 ||
       typeof item.department !== "string" ||
       item.department.length > 200 ||
-      !["active", "inactive"].includes(String(item.status)) ||
+      !["active", "inactive", "unknown"].includes(String(item.status)) ||
       (item.manager !== undefined &&
         (typeof item.manager !== "string" || item.manager.length > 200))
     )
@@ -344,6 +348,9 @@ export function validateSavedRun(raw: unknown): SavedRun {
       department: item.department,
       status: item.status as Employee["status"],
       ...(typeof item.manager === "string" ? { manager: item.manager } : {}),
+      ...(typeof item.office === "string" ? { office: item.office.slice(0,120) } : {}),
+      ...(typeof item.level === "string" ? { level: item.level.slice(0,80) } : {}),
+      ...(typeof item.costCenter === "string" ? { costCenter: item.costCenter.slice(0,120) } : {}),
     };
   });
   const policy = validatePolicy(run.policy);
