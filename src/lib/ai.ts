@@ -51,6 +51,7 @@ export const PROVIDERS: {
     defaultModel: "gemini-3.5-flash-lite",
     keyPlaceholder: "AIza…",
   },
+  { id: "openrouter", name: "OpenRouter", defaultModel: "openai/gpt-4o-mini", keyPlaceholder: "sk-or-v1-…" },
 ];
 
 /** No key, prompt, image, or AI response is written to browser storage here. */
@@ -58,8 +59,8 @@ export async function requestAI(
   config: AIConfig,
   input: AIInput,
 ): Promise<AIResult> {
-  if (!config.apiKey.trim())
-    throw new Error("Add your API key in AI settings first.");
+  if (!(config.provider === "openrouter" && config.useServerKey && config.accessToken?.trim()) && !config.apiKey.trim())
+    throw new Error("Enter an API key or server-key access code in AI settings.");
   if (!config.model.trim())
     throw new Error("Choose a model in AI settings first.");
   const conversation = input.conversation
@@ -85,7 +86,8 @@ export async function requestAI(
       body: JSON.stringify({
         provider: config.provider,
         model: config.model.trim(),
-        apiKey: config.apiKey.trim(),
+        apiKey: config.useServerKey ? "" : config.apiKey.trim(),
+        ...(config.provider === "openrouter" && config.useServerKey ? { useServerKey: true, accessToken: config.accessToken?.trim() || "" } : {}),
         ...input,
         ...(conversation ? { conversation } : {}),
       }),
