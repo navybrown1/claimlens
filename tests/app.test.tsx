@@ -46,7 +46,7 @@ function file(name: string, text: string, type = "text/csv") {
   return result;
 }
 const navigation = (name: RegExp | string) =>
-  screen.getByRole("button", { name });
+  screen.getAllByRole("button", { name })[0];
 type User = ReturnType<typeof userEvent.setup>;
 async function openImport(user: User) {
   await user.click(navigation(/^Import data$/));
@@ -151,11 +151,8 @@ describe("ClaimLens user workflows", () => {
   it("rejects a duplicate manual claim ID and adds a corrected claim to the searchable queue", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(navigation(/^Review claims/));
-    const existingId = screen
-      .getAllByRole("button", { name: /^Review CL-/ })[0]
-      .getAttribute("aria-label")!
-      .replace("Review ", "");
+    await importRealWorkspace(user);
+    const existingId = "REAL-1";
     await user.click(navigation(/^Add claim$/));
     const dialog = screen.getByRole("dialog", { name: "Add an expense claim" });
     const id = within(dialog).getByLabelText("Claim ID");
@@ -259,6 +256,7 @@ describe("ClaimLens user workflows", () => {
   it("keeps API keys out of saved audits, clears them when providers change, and forgets them on reload", async () => {
     const user = userEvent.setup();
     const app = render(<App />);
+    await importRealWorkspace(user);
     await user.click(navigation(/^AI copilot/));
     const first = "sk-ui-test-only-first-secret";
     const second = "sk-ant-ui-test-only-second-secret";
