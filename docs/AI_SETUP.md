@@ -4,7 +4,7 @@ ClaimLens works without AI. Imports, deterministic policy checks, review decisio
 
 ## Connect a provider
 
-1. Open **AI settings** in ClaimLens.
+1. Open **AI copilot** and find **Your AI connection** in ClaimLens.
 2. Choose **OpenAI**, **Anthropic**, or **Google Gemini**.
 3. Enter a key from that provider's developer account. A ChatGPT, Claude, or Gemini consumer subscription is not itself an API key.
 4. Use the suggested model or enter a model ID available to your provider account.
@@ -17,10 +17,10 @@ The API key is held in the current app's memory. It is not saved to localStorage
 
 These model IDs were checked against provider documentation on November 20, 2026. Availability and billing depend on the provider account. The model field is editable so the app can continue working when provider offerings change.
 
-| Provider | Suggested model | API used |
-| --- | --- | --- |
-| OpenAI | `gpt-6-luna` | `POST https://api.openai.com/v1/responses` |
-| Anthropic | `claude-haiku-5-5` | `POST https://api.anthropic.com/v1/messages` |
+| Provider      | Suggested model         | API used                                                                               |
+| ------------- | ----------------------- | -------------------------------------------------------------------------------------- |
+| OpenAI        | `gpt-6-luna`            | `POST https://api.openai.com/v1/responses`                                             |
+| Anthropic     | `claude-haiku-5-5`      | `POST https://api.anthropic.com/v1/messages`                                           |
 | Google Gemini | `gemini-3.5-flash-lite` | `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
 
 No custom provider URL is accepted. Model IDs cannot contain path separators or query strings. The API routes requests only to the three hosts above and rejects redirects.
@@ -71,15 +71,15 @@ The tests cover provider request shapes, source-to-model privacy boundaries, cur
 
 ## Troubleshooting
 
-| Message | What to check |
-| --- | --- |
-| Add your API key | Enter a provider developer API key in AI settings. |
-| Provider rejected this key or model access | Key validity, restricted permissions, provider selection, and model access. |
-| Provider rate or credit limit reached | Provider dashboard quota, credit, billing, or temporary request rate. |
-| Provider could not use model or input | Exact model ID and text/vision support. |
-| Request timed out | Try again with a smaller context or faster model. |
-| Receipt too large | Resize or crop to PNG/JPEG/WebP under 2.5 MiB. |
-| Provider returned no readable answer | The output budget may have been used by reasoning, content may have been refused, or the selected model may use a different output mode. Choose a supported text model. |
+| Message                                    | What to check                                                                                                                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add your API key                           | Enter a provider developer API key in AI copilot > Your AI connection.                                                                                                  |
+| Provider rejected this key or model access | Key validity, restricted permissions, provider selection, and model access.                                                                                             |
+| Provider rate or credit limit reached      | Provider dashboard quota, credit, billing, or temporary request rate.                                                                                                   |
+| Provider could not use model or input      | Exact model ID and text/vision support.                                                                                                                                 |
+| Request timed out                          | Try again with a smaller context or faster model.                                                                                                                       |
+| Receipt too large                          | Resize or crop to PNG/JPEG/WebP under 2.5 MiB.                                                                                                                          |
+| Provider returned no readable answer       | The output budget may have been used by reasoning, content may have been refused, or the selected model may use a different output mode. Choose a supported text model. |
 
 ## Official implementation references
 
