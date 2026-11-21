@@ -66,7 +66,6 @@ import type {
   Workspace,
 } from "./types";
 import { auditClaims, DEFAULT_POLICY } from "./lib/audit";
-import { generateDemo } from "./lib/demo";
 import { parseClaimsFile, parseEmployeesFile } from "./lib/imports";
 import {
   claimsToCSV,
@@ -149,15 +148,7 @@ const nav = [
   { id: "settings", label: "Policy settings", icon: SlidersHorizontal },
 ] as const;
 function freshWorkspace(): Workspace {
-  const demo = generateDemo();
-  return {
-    ...demo,
-    policy: { ...DEFAULT_POLICY },
-    decisions: {},
-    events: [],
-    isDemo: true,
-    name: "Demo workspace",
-  };
+  return { claims: [], employees: [], policy: { ...DEFAULT_POLICY }, decisions: {}, events: [], isDemo: false, name: "Expense audit" };
 }
 function IconBadge({
   children,
@@ -351,7 +342,8 @@ function UploadZone({
 
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>(freshWorkspace);
-  const [runs, setRuns] = useState<SavedRun[]>(getSavedRuns);
+  useEffect(() => { putSavedRuns(getSavedRuns().filter((run) => !run.isDemo)); }, []);
+  const [runs, setRuns] = useState<SavedRun[]>(() => getSavedRuns().filter((run) => !run.isDemo));
   const [historyClaims, setHistoryClaims] = useState<Claim[]>([]);
   const [page, setPage] = useState<Page>("overview");
   const [modal, setModal] = useState<Modal>(null);
@@ -371,9 +363,11 @@ export default function App() {
     { id: string; text: string; type: string }[]
   >([]);
   const [config, setConfig] = useState<AIConfig>({
-    provider: "openai",
+    provider: "openrouter",
     model: "",
     apiKey: "",
+    useServerKey: false,
+    accessToken: "",
   });
   const [keyVisible, setKeyVisible] = useState(false);
   const [connection, setConnection] = useState<
@@ -410,6 +404,7 @@ export default function App() {
     ...config,
     model: config.model || provider.defaultModel,
   };
+  const canUseAI = Boolean(config.apiKey.trim() || (config.provider === "openrouter" && config.useServerKey && config.accessToken?.trim()));
   const audited = useMemo(
     () =>
       auditClaims(
@@ -529,7 +524,7 @@ export default function App() {
   useEffect(() => {
     configRevision.current += 1;
     setConnection("idle");
-  }, [config.provider, config.model, config.apiKey]);
+  }, [config.provider, config.model, config.apiKey, config.useServerKey, config.accessToken]);
   useEffect(() => {
     setReviewNote(detail ? workspace.decisions[detail]?.note || "" : "");
   }, [detail]);
@@ -754,7 +749,7 @@ export default function App() {
   ) {
     go("copilot");
     setDetail(null);
-    if (!config.apiKey.trim()) {
+    if (!canUseAI) {
       setPrompt(text);
       toast("Add your API key in the connection panel to use AI.", "error");
       return;
@@ -811,7 +806,7 @@ export default function App() {
     }
   }
   async function testConnection() {
-    if (!config.apiKey.trim()) {
+    if (!canUseAI) {
       toast("Enter your API key first.", "error");
       return;
     }
@@ -854,7 +849,7 @@ export default function App() {
   }
   async function extractReceipt() {
     if (!receiptImage || receiptBusy) return;
-    if (!config.apiKey.trim()) {
+    if (!canUseAI) {
       toast("Connect an AI provider in AI copilot first.", "error");
       return;
     }
@@ -2203,6 +2198,8 @@ export default function App() {
                             provider: p.id,
                             model: p.defaultModel,
                             apiKey: "",
+                            useServerKey: false,
+                            accessToken: "",
                           });
                           setConnection("idle");
                           setKeyVisible(false);
@@ -2231,21 +2228,27 @@ export default function App() {
                       Editable. Use a model available to your API account.
                     </small>
                   </div>
+                  {config.provider === "openrouter" && (
+                    <label className="field" style={{display:"flex",gap:8,alignItems:"center"}}>
+                      <input type="checkbox" checked={!!config.useServerKey} onChange={(e) => setConfig((c) => ({ ...c, useServerKey: e.target.checked, apiKey: "", accessToken: "" }))} />
+                      Use OpenRouter key stored in Vercel (requires workspace access code)
+                    </label>
+                  )}
                   <div className="field">
                     <label className="field-label" htmlFor="ai-key">
-                      API key
+                      {config.provider === "openrouter" && config.useServerKey ? "Workspace access code" : "API key"}
                     </label>
                     <div className="key-input-wrap">
                       <input
                         className="input"
                         id="ai-key"
                         type={keyVisible ? "text" : "password"}
-                        value={config.apiKey}
-                        placeholder={provider.keyPlaceholder}
+                        value={config.provider === "openrouter" && config.useServerKey ? config.accessToken || "" : config.apiKey}
+                        placeholder={config.provider === "openrouter" && config.useServerKey ? "Enter private access code" : provider.keyPlaceholder}
                         autoComplete="off"
                         spellCheck={false}
                         onChange={(e) => {
-                          setConfig((c) => ({ ...c, apiKey: e.target.value }));
+                          setConfig((c) => c.provider === "openrouter" && c.useServerKey ? { ...c, accessToken: e.target.value } : { ...c, apiKey: e.target.value });
                           setConnection("idle");
                         }}
                         maxLength={4096}
@@ -2267,7 +2270,7 @@ export default function App() {
                   <button
                     className="button primary full-width"
                     onClick={testConnection}
-                    disabled={connection === "testing" || !config.apiKey.trim()}
+                    disabled={connection === "testing" || !canUseAI}
                   >
                     {connection === "testing" ? (
                       <Loader2 className="spinner" size={16} />
@@ -2285,11 +2288,11 @@ export default function App() {
                   <small className="helper-text connection-cost">
                     Testing sends a small, billable request to your provider.
                   </small>
-                  {config.apiKey && (
+                  {canUseAI && (
                     <button
                       className="button ghost small full-width"
                       onClick={() => {
-                        setConfig((c) => ({ ...c, apiKey: "" }));
+                        setConfig((c) => ({ ...c, apiKey: "", accessToken: "", useServerKey: false }));
                         setConnection("idle");
                         setKeyVisible(false);
                         toast("API key removed from this session.");
@@ -2717,23 +2720,7 @@ export default function App() {
                       >
                         Start a new audit
                       </button>
-                      <button
-                        className="button ghost full-width"
-                        type="button"
-                        onClick={() => {
-                          setWorkspace(freshWorkspace());
-                          setPolicyDraft({ ...DEFAULT_POLICY });
-                          setHistoryClaims([]);
-                          setFileNames({});
-                          setDetail(null);
-                          go("overview");
-                          toast(
-                            "Fictional demo data loaded. Saved audits remain available.",
-                          );
-                        }}
-                      >
-                        Explore demo data
-                      </button>
+
                     </div>
                   </section>
                 </aside>
