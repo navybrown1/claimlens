@@ -641,13 +641,19 @@ export default function App() {
   }
   async function importFile(
     file: File,
-    kind: "claims" | "employees" | "history",
+    kind: "claims" | "employees" | "history" | "restore",
   ) {
     if (busyImport) return;
     setBusyImport(kind);
     setImportNotes([]);
     try {
-      if (kind === "history") {
+      if (kind === "restore") {
+        const run = await parseHistoryFile(file);
+        if (run.isDemo) throw new Error("This backup contains fictional demonstration data. Import a real audit instead.");
+        restoreRun(run);
+        setFileNames({ restore: file.name });
+        setModal(null);
+      } else if (kind === "history") {
         const run = await parseHistoryFile(file);
         setHistoryClaims(run.claims);
         setWorkspace((w) => ({ ...w, decisions: {} }));
@@ -2794,6 +2800,18 @@ export default function App() {
               busy={!!busyImport}
               fileText={fileNames.employees}
               testId="employees-file"
+            />
+          </div>
+          <div className="history-upload">
+            <UploadZone
+              title="Restore complete audit backup"
+              text="Load a private ClaimLens JSON backup with claims, roster, policy, and review history in one step."
+              accept=".json"
+              icon={FolderClock}
+              onFile={(f) => void importFile(f, "restore")}
+              busy={!!busyImport}
+              fileText={fileNames.restore}
+              testId="restore-audit-file"
             />
           </div>
           <div className="template-row">
