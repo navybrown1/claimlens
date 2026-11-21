@@ -2,6 +2,8 @@
 
 **Every expense, in focus.**
 
+**Privacy:** ClaimLens starts empty. Import private records in your own browser, not in public GitHub. No fictional claims appear on startup.
+
 ClaimLens is an expense review workspace that turns exports into an organized queue of policy exceptions, supporting evidence, and human decisions. It combines transparent checks with an optional AI copilot that uses your own provider API key.
 
 [Open ClaimLens](https://claimlens-iota.vercel.app) · [Source repository](https://github.com/navybrown1/claimlens) · [AI setup and implementation details](docs/AI_SETUP.md)
@@ -17,15 +19,15 @@ ClaimLens is an expense review workspace that turns exports into an organized qu
 - See department and category spending, exception counts, and review progress.
 - Adjust the example policy and rerun the checks.
 - Save up to **12 audit snapshots** in this browser and download portable JSON backups or spreadsheet-ready CSV reports.
-- Use **OpenAI, Anthropic, or Google Gemini** for summaries, questions, explanations, follow-up drafts, and receipt extraction.
+- Use **OpenRouter, OpenAI, Anthropic, or Google Gemini** for summaries, questions, explanations, follow-up drafts, and receipt extraction.
 
-The first visit loads **36 fictional claims and 12 fictional employees** so you can explore the app. The demo banner identifies this data. Import your own files or start a new audit when you are ready.
+The initial workspace has **zero sample claims and zero sample employees**. Import your own files; demo snapshots from previous versions are cleared when the app loads.
 
 ## Your first audit
 
 1. Open **Import data** and download the claims and employee templates if needed.
 2. Import the claims export and employee roster. Importing either into the demo clears the other demo dataset, so fictional employees cannot silently validate real claims. Either import order works.
-3. Optionally load a previous ClaimLens JSON backup for duplicate comparison.
+3. Optionally load a previous ClaimLens JSON backup for duplicate comparison. Impossible expense dates are preserved for manual correction rather than dropped.
 4. Open **Policy settings**, enter your organization's actual rules, and save.
 5. Open **Review claims**. Read each finding, compare it with the source evidence, and record a decision or follow-up note.
 6. Choose **Save audit**. In **Audit history**, download a JSON backup for a durable copy or export the review CSV from the claims view.
@@ -44,7 +46,7 @@ Review decisions are **Pending review**, **Approved**, **Rejected**, or **Follow
 
 ## Example policy
 
-The included values are editable product examples. They are not legal requirements, tax advice, or an official reimbursement schedule.
+The included values are editable product examples, **not verified organizational policy**. They are not legal requirements, tax advice, or an official reimbursement schedule.
 
 | Setting                     | Initial value | How it is applied                                                         |
 | --------------------------- | ------------- | ------------------------------------------------------------------------- |
@@ -91,7 +93,7 @@ JSON can be a row array or an object containing a `claims` array. Unknown fields
 
 ### Employee roster
 
-Use `employeeId` or `id`, `name` or `employeeName`, `department`, `status`, and optional `manager`. Employee ID and name are required. Status must explicitly identify the employee as active or inactive; missing or unrecognized status values are not assumed active. Duplicate employee IDs block the import. JSON can be an array or an object containing an `employees` array.
+Use `employeeId` or `id`, `name` or `employeeName`, `department`, `status`, and optional `manager`. Employee ID is required. If no name is supplied, the app displays the ID rather than inventing a name. Missing status is retained as **unknown** and flagged for eligibility review, never assumed active. Office, level, and cost center are retained. Duplicate employee IDs block the import.
 
 ### Excel behavior
 
@@ -102,7 +104,7 @@ Only the **first worksheet** is imported. It must have a header row and no more 
 The app's imports, rules, decisions, analytics, and backups work without an API key.
 
 1. Open **AI copilot** and find **Your AI connection**.
-2. Choose a provider and enter your developer API key in the password field.
+2. Choose a provider and enter your developer API key. For OpenRouter, alternatively select the Vercel server-key option and enter a separate workspace access code.
 3. Use a model available to your account. The model field is editable.
 4. Select **Test connection**. This makes a small provider request and may consume credits.
 5. Ask a question, use a suggested prompt, explain an individual claim, or extract a receipt.
@@ -114,6 +116,12 @@ Official setup guides: [OpenAI](https://developers.openai.com/api/docs/quickstar
 The copilot receives full-run counts and separate currency totals, plus up to **60 claims**, ordered by priority with a selected claim first. Employee names, original employee IDs, descriptions, reviewer notes, and decisions are excluded from the structured audit context. Chat also includes your question and up to six recent messages. Text you type can still contain personal information.
 
 Receipt extraction accepts **PNG, JPEG, or WebP up to 2.5 MiB**. Clicking Extract receipt sends the complete image to the selected provider. The returned fields create a draft that you must review before adding it. Images are not stored in audit snapshots.
+
+### OpenRouter server key and access control
+
+To use an OpenRouter key already added in Vercel, configure two **Production secrets**: `OPENROUTER_API_KEY` for the provider key and `CLAIMLENS_ACCESS_TOKEN` for a separate, long random workspace access code. Redeploy after changing variables. In AI copilot select OpenRouter, enable the server-key option, and enter the workspace access code. Do not expose these secrets in source control.
+
+This app has no built-in login, shared backend database, or role-based access. Protect the deployment if working with confidential employee records. Imports and ordinary policy checks run locally in your browser; AI actions send selected context to your provider only when requested. Snapshots remain local to that browser unless exported.
 
 ## Data and privacy boundaries
 
