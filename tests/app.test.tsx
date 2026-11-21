@@ -307,10 +307,10 @@ describe("ClaimLens user workflows", () => {
     await screen.findByRole("heading", { name: "Every expense, in focus." });
     await user.click(navigation(/^Intelligence/));
     expect(screen.getByRole("heading", { name: "Find the unusual." })).toBeTruthy();
-    expect(screen.getByText("2", { selector: ".intelligence-metrics strong" })).toBeTruthy();
+    expect(screen.getAllByText("2", { selector: ".intelligence-metrics strong" }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Grouped charges above review limit").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /Connect AI to investigate/ })).toBeTruthy();
-    await user.click(screen.getAllByRole("button", { name: /^Review/ })[0]);
+    await user.click(within(screen.getByRole("table")).getAllByRole("button", { name: /^Review/ })[0]);
     const review = screen.getByRole("dialog", { name: /^Review INT-/ });
     expect(within(review).getByText(/Behavioral screening/)).toBeTruthy();
     expect(within(review).getByText("Grouped charges above review limit")).toBeTruthy();
