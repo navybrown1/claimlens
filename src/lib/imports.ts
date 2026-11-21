@@ -282,6 +282,7 @@ function readClaims(rows: Row[], warnings: string[] = []): ImportResult<Claim> {
   let missingSubmitted = 0;
   let missingReceipt = 0;
   let invalidExpenseDate = 0;
+  let credits = 0;
   for (let i = 0; i < rows.length; i++) {
     const row = remap(rows[i]);
     const rowNumber = Number(rows[i].__sourceRow) || i + 2;
@@ -300,8 +301,9 @@ function readClaims(rows: Row[], warnings: string[] = []): ImportResult<Claim> {
     if (!employeeId || employeeId.length > 120)
       failures.push("an employee ID of 1–120 characters");
     if (!date) failures.push("an expense date");
-    if (!Number.isFinite(amount) || amount <= 0)
-      failures.push("a positive amount with at most two decimal places");
+    if (!Number.isFinite(amount) || amount === 0)
+      failures.push("a nonzero amount with at most two decimal places");
+    if (Number.isFinite(amount) && amount < 0) credits++;
     if (failures.length) {
       warnings.push(
         `Row ${rowNumber} (${id || "no ID"}) skipped: needs ${failures.join(", ")}.`,
@@ -379,6 +381,7 @@ function readClaims(rows: Row[], warnings: string[] = []): ImportResult<Claim> {
     });
   }
   if (invalidExpenseDate) warnings.push(`${invalidExpenseDate} claim(s) have invalid expense dates. Original values retained and flagged for review.`);
+  if (credits) warnings.push(`${credits} negative amount(s) were retained as credits or adjustments. Reconcile them against the original transactions.`);
   if (missingCurrency)
     warnings.push(
       `${missingCurrency} row(s) had no currency; USD was used. Confirm this before reviewing totals.`,
