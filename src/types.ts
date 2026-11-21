@@ -15,13 +15,20 @@ export interface Claim {
   receipt: boolean;
   description: string;
   mileage?: number;
+  nights?: number;
+  attendees?: number;
+  fareClass?: string;
+  preapprovalId?: string;
 }
 export interface Employee {
   id: string;
   name: string;
   department: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "unknown";
   manager?: string;
+  office?: string;
+  level?: string;
+  costCenter?: string;
 }
 export interface Policy {
   baseCurrency: string;
@@ -85,9 +92,11 @@ export interface Workspace {
   isDemo: boolean;
   name: string;
 }
-export type AIProvider = "openai" | "anthropic" | "gemini";
+export type AIProvider = "openai" | "anthropic" | "gemini" | "openrouter";
 export interface AIConfig {
   provider: AIProvider;
   model: string;
   apiKey: string;
+  useServerKey?: boolean;
+  accessToken?: string;
 }
