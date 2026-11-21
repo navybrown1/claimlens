@@ -65,6 +65,7 @@ describe("local behavioral anomaly analysis", () => {
       claim("UNRELATED", 120, { merchant: "The Hotel Example", employeeId: "OTHER", category: "Hotel", date: "2026-09-12" }),
     ], policy);
     expect(report.items.find((item) => item.claimId === "A")?.signals.find((s) => s.code === "near-duplicate")?.relatedIds).toContain("B");
+    expect(report.items.find((item) => item.claimId === "A")?.priority).toBe("high");
     expect(report.items.find((item) => item.claimId === "UNRELATED")).toBeUndefined();
     const exact = detectAnomalies([
       claim("ONE", 15), claim("TWO", 15),
