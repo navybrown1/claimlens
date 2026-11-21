@@ -36,11 +36,19 @@ const aliases: Record<string, string[]> = {
     "name",
     "staffname",
   ],
-  department: ["department", "dept", "costcentre", "costcenter", "team"],
+  department: ["department", "dept", "team"],
+  costCenter: ["costcentre", "costcenter"],
+  office: ["office"],
+  level: ["level"],
+  nights: ["nights"],
+  fareClass: ["fareclass"],
+  preapprovalId: ["preapprovalid"],
+  attendees: ["attendees"],
   date: ["date", "expensedate", "transactiondate", "purchasedate", "claimdate"],
   submittedDate: [
     "submitteddate",
     "submissiondate",
+    "submitdate",
     "datesubmitted",
     "submittedon",
     "submitted",
@@ -60,6 +68,7 @@ const aliases: Record<string, string[]> = {
     "expenseamount",
     "claimamount",
     "totalamount",
+    "amountusd",
     "grossamount",
   ],
   currency: ["currency", "currencycode", "ccy"],
@@ -272,12 +281,14 @@ function readClaims(rows: Row[], warnings: string[] = []): ImportResult<Claim> {
   let missingCurrency = 0;
   let missingSubmitted = 0;
   let missingReceipt = 0;
+  let invalidExpenseDate = 0;
   for (let i = 0; i < rows.length; i++) {
     const row = remap(rows[i]);
     const rowNumber = Number(rows[i].__sourceRow) || i + 2;
     const id = stringValue(row.id);
     const employeeId = stringValue(row.employeeId);
-    const date = parseDate(row.date);
+    const date = parseDate(row.date) || stringValue(row.date).slice(0, 10);
+    if (date && !parseDate(date)) invalidExpenseDate++;
     const amount = parseAmount(row.amount);
     if (id && seen.has(id.toLowerCase()))
       errors.push(
@@ -288,7 +299,7 @@ function readClaims(rows: Row[], warnings: string[] = []): ImportResult<Claim> {
     if (!id || id.length > 120) failures.push("a claim ID of 1–120 characters");
     if (!employeeId || employeeId.length > 120)
       failures.push("an employee ID of 1–120 characters");
-    if (!date) failures.push("a valid expense date (YYYY-MM-DD or MM/DD/YYYY)");
+    if (!date) failures.push("an expense date");
     if (!Number.isFinite(amount) || amount <= 0)
       failures.push("a positive amount with at most two decimal places");
     if (failures.length) {
@@ -344,6 +355,9 @@ function readClaims(rows: Row[], warnings: string[] = []): ImportResult<Claim> {
       );
       continue;
     }
+    const parseCount = (v: unknown) => { const raw = stringValue(v); if (!raw) return undefined; const n = Number(raw); if (Number.isSafeInteger(n) && n > 0 && n < 10000) return n; warnings.push(`Row ${rowNumber} (${id}): invalid supplementary count ignored.`); return undefined; };
+    const nights = parseCount(row.nights);
+    const attendees = parseCount(row.attendees);
     data.push({
       id,
       employeeId,
@@ -358,8 +372,13 @@ function readClaims(rows: Row[], warnings: string[] = []): ImportResult<Claim> {
       receipt,
       description: stringValue(row.description).slice(0, 5000),
       ...(mileage !== undefined ? { mileage } : {}),
+      ...(nights !== undefined ? { nights } : {}),
+      ...(attendees !== undefined ? { attendees } : {}),
+      ...(stringValue(row.fareClass) ? { fareClass: stringValue(row.fareClass).slice(0,100) } : {}),
+      ...(stringValue(row.preapprovalId) ? { preapprovalId: stringValue(row.preapprovalId).slice(0,120) } : {}),
     });
   }
+  if (invalidExpenseDate) warnings.push(`${invalidExpenseDate} claim(s) have invalid expense dates. Original values retained and flagged for review.`);
   if (missingCurrency)
     warnings.push(
       `${missingCurrency} row(s) had no currency; USD was used. Confirm this before reviewing totals.`,
@@ -398,6 +417,8 @@ function readEmployees(
   const data: Employee[] = [];
   const errors: string[] = [];
   const seen = new Set<string>();
+  let missingNames = 0;
+  let unknownStatuses = 0;
   for (let i = 0; i < rows.length; i++) {
     const row = remap(rows[i]);
     const rowNumber = Number(rows[i].__sourceRow) || i + 2;
@@ -410,10 +431,8 @@ function readEmployees(
         `Duplicate employee ID "${id}" at row ${rowNumber}. Resolve duplicates before importing.`,
       );
     seen.add(id.toLowerCase());
-    if (!id || !name || id.length > 120) {
-      warnings.push(
-        `Row ${rowNumber} skipped: an employee ID and name are required.`,
-      );
+    if (!id || id.length > 120) {
+      warnings.push(`Row ${rowNumber} skipped: an employee ID is required.`);
       continue;
     }
     const active = ["active", "true", "yes", "1", "employed"].includes(
@@ -428,26 +447,25 @@ function readEmployees(
       "left",
       "former",
     ].includes(statusValue);
-    if (!active && !inactive) {
-      warnings.push(
-        `Row ${rowNumber} (${id}) skipped: status must explicitly be active or inactive.`,
-      );
-      continue;
-    }
+    if (!name) missingNames++;
+    if (!active && !inactive) unknownStatuses++;
     data.push({
       id,
-      name: name.slice(0, 200),
+      name: (name || id).slice(0, 200),
       department: department.slice(0, 200),
-      status: active ? "active" : "inactive",
+      status: active ? "active" : inactive ? "inactive" : "unknown",
+      ...(row.office ? { office: stringValue(row.office).slice(0,120) } : {}),
+      ...(row.level ? { level: stringValue(row.level).slice(0,80) } : {}),
+      ...(row.costCenter ? { costCenter: stringValue(row.costCenter).slice(0,120) } : {}),
       ...(row.manager
         ? { manager: stringValue(row.manager).slice(0, 200) }
         : {}),
     });
   }
+  if (missingNames) warnings.push(`${missingNames} employees have no names. Their IDs are shown as labels.`);
+  if (unknownStatuses) warnings.push(`${unknownStatuses} employees have no confirmed active/inactive status. Eligibility is flagged for review.`);
   if (!data.length && !errors.length)
-    errors.push(
-      "No valid employees were found. Required columns: employeeId (or id), name, status.",
-    );
+    errors.push("No valid employees were found. Employee ID is required.");
   return {
     data: errors.length ? [] : data,
     warnings: warnings.slice(0, 200),
