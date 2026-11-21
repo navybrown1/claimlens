@@ -30,7 +30,7 @@ The initial workspace has **zero sample claims and zero sample employees**. Impo
 3. Optionally load a previous ClaimLens JSON backup for duplicate comparison. Impossible expense dates are preserved for manual correction rather than dropped.
 4. Open **Policy settings**, enter your organization's actual rules, and save.
 5. Open **Review claims**. Read each finding, compare it with the source evidence, and record a decision or follow-up note.
-6. Choose **Save audit**. In **Audit history**, download a JSON backup for a durable copy or export the review CSV from the claims view.
+6. Choose **Save audit**. In **Audit history**, download a JSON backup for a durable copy or export the review CSV from the claims view. To reopen a backup on another session, use **Import data → Restore complete audit backup** and select its JSON file.
 
 New claim imports replace the current session's claims and decisions. Policy, roster, and historical-comparison changes can invalidate earlier review decisions. Save a snapshot before replacing data you want to keep.
 
@@ -76,7 +76,7 @@ Each input file may contain up to **10 MiB** and **10,000 data rows**. Use `.csv
 | `id`            | Yes                | Unique claim ID, up to 120 characters. Duplicate IDs are rejected case-insensitively.                                   |
 | `employeeId`    | Yes                | Employee identifier that matches the roster.                                                                            |
 | `date`          | Yes                | Expense date as `YYYY-MM-DD` or `MM/DD/YYYY`.                                                                           |
-| `amount`        | Yes                | Positive number with at most two decimal places. Common currency symbols and thousands separators are supported.        |
+| `amount`        | Yes                | Nonzero signed number with at most two decimal places. Negative values are retained as credits or adjustments, flagged for reconciliation, and included in the net total. Common currency symbols and thousands separators are supported.        |
 | `employeeName`  | No                 | Display name; a missing name can be resolved from the employee roster.                                                  |
 | `department`    | No                 | Department; a missing value can be resolved from the roster.                                                            |
 | `submittedDate` | Recommended        | Submission date. A missing or invalid value remains blank and is flagged.                                               |
@@ -123,7 +123,7 @@ To use an OpenRouter key already added in Vercel, configure two **Production sec
 
 This app has no built-in login, shared backend database, or role-based access. Protect the deployment if working with confidential employee records. Imports and ordinary policy checks run locally in your browser; AI actions send selected context to your provider only when requested. Snapshots remain local to that browser unless exported.
 
-## Data and privacy boundaries
+The dashboard shows **net claimed** after credits, not gross positive claims. Review negative adjustments against the original transactions. A source export that lacks employee status leaves eligibility unverified until confirmed by the organization.\n\n## Data and privacy boundaries
 
 | Data or action                            | Where it goes                                                                 |
 | ----------------------------------------- | ----------------------------------------------------------------------------- |
