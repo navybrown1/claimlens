@@ -253,6 +253,37 @@ describe("ClaimLens user workflows", () => {
     ).toBeTruthy();
   });
 
+  it("restores a complete local audit including a credit, unknown status and invalid expense date", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const run: SavedRun = {
+      id: "private-backup-test",
+      name: "Private review",
+      createdAt: new Date().toISOString(),
+      claims: [
+        expense(),
+        { ...expense(), id: "CREDIT-1", date: "2026-09-31", amount: -22.50, description: "Refund adjustment" },
+      ],
+      employees: [{ ...employees[0], status: "unknown" }],
+      policy: { ...DEFAULT_POLICY },
+      decisions: {},
+      events: [],
+    };
+    const dialog = await openImport(user);
+    await user.upload(
+      within(dialog).getByTestId("restore-audit-file"),
+      file("private-audit.json", JSON.stringify(run), "application/json"),
+    );
+    await screen.findByRole("heading", { name: "Every expense, in focus." });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(navigation(/^Review claims/));
+    expect(screen.getByRole("button", { name: "Review CREDIT-1" })).toBeTruthy();
+    const credit = await review(user, "CREDIT-1");
+    expect(within(credit).getByText("Credit or refund adjustment")).toBeTruthy();
+    expect(within(credit).getByText("Expense date needed")).toBeTruthy();
+    expect(within(credit).getByText("Employment status unverified")).toBeTruthy();
+  });
+
   it("keeps API keys out of saved audits, clears them when providers change, and forgets them on reload", async () => {
     const user = userEvent.setup();
     const app = render(<App />);
