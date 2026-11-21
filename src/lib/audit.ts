@@ -214,6 +214,7 @@ export function auditClaims(
         "high",
       );
     else {
+      if (employee.status === "unknown") add("unverified-employee-status", "Employment status unverified", "The roster does not confirm whether the employee is active. Verify eligibility before approval.", "medium");
       if (employee.status === "inactive")
         add(
           "inactive-employee",
