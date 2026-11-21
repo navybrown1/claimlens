@@ -60,7 +60,7 @@ export async function requestAI(
   input: AIInput,
 ): Promise<AIResult> {
   if (!(config.provider === "openrouter" && config.useServerKey && config.accessToken?.trim()) && !config.apiKey.trim())
-    throw new Error("Enter an API key or server-key access code in AI settings.");
+    throw new Error("Add your API key or server-key access code in AI settings first.");
   if (!config.model.trim())
     throw new Error("Choose a model in AI settings first.");
   const conversation = input.conversation
