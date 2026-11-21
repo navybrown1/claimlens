@@ -5,13 +5,13 @@ ClaimLens works without AI. Imports, deterministic policy checks, review decisio
 ## Connect a provider
 
 1. Open **AI copilot** and find **Your AI connection** in ClaimLens.
-2. Choose **OpenAI**, **Anthropic**, or **Google Gemini**.
-3. Enter a key from that provider's developer account. A ChatGPT, Claude, or Gemini consumer subscription is not itself an API key.
+2. Choose **OpenRouter**, **OpenAI**, **Anthropic**, or **Google Gemini**.
+3. Enter a key from that provider's developer account. For OpenRouter, you can alternatively choose a protected Vercel server key and enter your workspace access code. Consumer AI subscriptions are not themselves developer API keys.
 4. Use the suggested model or enter a model ID available to your provider account.
 5. Test the connection. This sends a small generation request and can consume provider credits.
 6. Ask a question, request an audit summary, explain a selected claim, draft a follow-up, or extract a receipt.
 
-The API key is held in the current app's memory. It is not saved to localStorage, sessionStorage, exports, GitHub, a database, or server logs by ClaimLens. Refreshing the app or disconnecting clears the key. Do not paste API keys into the chat box or claim data.
+Directly entered API keys and workspace access codes are held only in the current app's memory. They are not saved to localStorage, sessionStorage, audit exports, GitHub, or a database. Refreshing the app or disconnecting clears them. An optional OpenRouter API key is stored separately as a Vercel secret and can be used only with a distinct access code. Do not paste API keys into the chat box or claim data.
 
 ### Suggested models
 
@@ -19,11 +19,12 @@ These model IDs were checked against provider documentation on November 20, 2026
 
 | Provider      | Suggested model         | API used                                                                               |
 | ------------- | ----------------------- | -------------------------------------------------------------------------------------- |
+| OpenRouter    | `openai/gpt-4o-mini`    | `POST https://openrouter.ai/api/v1/chat/completions`                          |
 | OpenAI        | `gpt-6-luna`            | `POST https://api.openai.com/v1/responses`                                             |
 | Anthropic     | `claude-haiku-5-5`      | `POST https://api.anthropic.com/v1/messages`                                           |
 | Google Gemini | `gemini-3.5-flash-lite` | `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
 
-No custom provider URL is accepted. Model IDs cannot contain path separators or query strings. The API routes requests only to the three hosts above and rejects redirects.
+No custom provider URL is accepted. OpenRouter allows namespaced `provider/model` identifiers; direct providers do not allow slashes. The server uses only the four allowlisted provider hosts and rejects redirects.
 
 ## What is sent
 
@@ -33,7 +34,7 @@ Included individual claim fields are claim ID, a generated employee reference su
 
 A connection test does not send claim data. Receipt extraction sends the selected image to the selected provider. Images can contain names and other personal details, so inspect or crop the image before requesting extraction. ClaimLens does not upload images until extraction is requested.
 
-Requests pass through the app's Vercel function over HTTPS, then to the selected provider. The key is used only for that request. The function has no shared provider key and cannot charge a site owner's AI account. OpenAI requests set `store: false`; provider-side processing, abuse monitoring, retention, and billing remain governed by the selected provider and account settings. `store: false` is not a zero-retention guarantee.
+Requests pass through the app's Vercel function over HTTPS, then to the selected provider. The key is used only for that request. The server has no shared key by default. Only if the separate Vercel OpenRouter key and workspace access code are configured can a user with the access code make a billed request on the site owner's account. OpenAI requests set `store: false`; provider-side processing, abuse monitoring, retention, and billing remain governed by the selected provider and account settings. `store: false` is not a zero-retention guarantee.
 
 ## Capabilities and limits
 
@@ -49,9 +50,22 @@ Every extracted receipt field must be compared with the original. Unreadable fie
 
 The copilot uses one request per action and does not maintain a provider-hosted conversation. For chat, the UI can send up to six recent messages held in memory. Each message is capped at 1,500 characters, and the server accepts only user/assistant roles with a total ceiling of 10,000 characters. Prior messages are included as clearly delimited, untrusted conversation JSON before the current question. They may contain names or details you previously typed. Summary, explanation, draft, connection-test, and receipt actions do not accept chat history. The current workspace is the authoritative source for present claim facts. Clearing the chat removes its in-memory messages.
 
+### OpenRouter server-key configuration
+
+**Option A, direct key (recommended for a public demo):** select OpenRouter in the copilot and paste your own OpenRouter developer key; this is held only in the tab and used for explicit requests. The production environment variables are not needed for this mode.
+
+**Option B, protected Vercel key:** in the ClaimLens Vercel project configure two **Production** secrets:
+
+1. `OPENROUTER_API_KEY`: a valid OpenRouter API key.
+2. `CLAIMLENS_ACCESS_TOKEN`: a separate, strong random access code, ideally at least 32 random bytes, never the OpenRouter API key.
+
+Redeploy after setting either secret. In ClaimLens select **OpenRouter**, enable **Use OpenRouter key stored in Vercel**, and enter the distinct workspace access code. The server uses a constant-time comparison of SHA-256 hashes before it reads the provider key. Missing configuration fails closed with HTTP 503; wrong codes fail with HTTP 401. It never sends the OpenRouter key to the frontend.
+
+**Security limit:** this is an access code, not full authentication, organizational roles, user accounts, or rate limiting. Enable Vercel Deployment Protection, use an OpenRouter key with spending limits, and do not share the code. A public unprotected endpoint with a compromised code can consume API credits. The app never transmits complete import files when you merely upload them; explicit AI requests do send the allowed context or receipt image to the chosen provider.
+
 ## Developer setup
 
-The server handler is `api/ai.ts`. It accepts a Node `IncomingMessage` and `ServerResponse`, with either a parsed `req.body` from Vercel or a raw JSON request stream. It does not need environment variables, provider SDK dependencies, a database, or secret provisioning. It is deployable as a Vercel Node function: Vercel automatically compiles TypeScript entry points in the root `api/` directory. The current Vercel documentation supports the Node request/response signature and an exported configuration object for Node `/api` routes. `api/ai.ts` exports `config = { maxDuration: 60 }`. The handler also catches errors from Vercel's lazy parsed-body getter and returns a safe HTTP 400.
+The server handler is `api/ai.ts`. It accepts a Node `IncomingMessage` and `ServerResponse`, with either a parsed `req.body` from Vercel or a raw JSON request stream. Direct user-key requests do not need environment variables or provider SDKs. Optional protected OpenRouter server-key mode requires two production environment variables, as described below. It is deployable as a Vercel Node function: Vercel automatically compiles TypeScript entry points in the root `api/` directory. The current Vercel documentation supports the Node request/response signature and an exported configuration object for Node `/api` routes. `api/ai.ts` exports `config = { maxDuration: 60 }`. The handler also catches errors from Vercel's lazy parsed-body getter and returns a safe HTTP 400.
 
 The frontend helper is `src/lib/ai.ts`. `requestAI(config, input)` sends a same-origin JSON POST to `/api/ai`, omits cookies, disables HTTP caching, and has a 55-second client timeout. The server sets no-store response headers and aborts the upstream request after 45 seconds. Configure the Vercel function for at least 60 seconds if the project's runtime default is lower.
 
