@@ -101,10 +101,10 @@ afterEach(() => {
 });
 
 describe("ClaimLens user workflows", () => {
-  it("replaces demo claims without leaking the demo employee roster, then validates the uploaded roster", async () => {
+  it("starts without fictional records, then validates the imported employee roster", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByText("DEMO")).toBeTruthy();
+    expect(screen.queryByText("DEMO")).toBeNull();
     const dialog = await openImport(user);
     await user.upload(
       within(dialog).getByTestId("claims-file"),
