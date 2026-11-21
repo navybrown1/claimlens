@@ -238,7 +238,7 @@ export function detectAnomalies(claims: AuditedClaim[], policy: Policy): Anomaly
     .map((c) => {
       const signals = signalById.get(c.id)!;
       const score = Math.min(100, signals.reduce((n, signal) => n + (weights[signal.code] || 10), 0));
-      return { claimId: c.id, score, priority: score >= 60 ? "high" as const : score >= 25 ? "medium" as const : "low" as const, signals };
+      return { claimId: c.id, score, priority: score >= 60 || signals.some((signal) => signal.severity === "high") ? "high" as const : score >= 25 ? "medium" as const : "low" as const, signals };
     })
     .sort((a, b) => b.score - a.score || a.claimId.localeCompare(b.claimId));
   const codes = new Map<string, { code: string; title: string; count: number }>();
