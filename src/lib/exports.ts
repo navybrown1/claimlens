@@ -258,7 +258,7 @@ function validateClaimList(input: unknown, label: string): Claim[] {
       typeof c.receipt !== "boolean" ||
       typeof c.amount !== "number" ||
       !Number.isFinite(parseAmount(c.amount)) ||
-      c.amount <= 0
+      c.amount === 0
     )
       throw new Error(
         `The ${label} contains an invalid receipt flag or amount.`,
