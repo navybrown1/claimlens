@@ -258,3 +258,31 @@ export function detectAnomalies(claims: AuditedClaim[], policy: Policy): Anomaly
     items,
   };
 }
+
+
+/** A local, spreadsheet-safe export. No network request is made. */
+export function anomaliesToCSV(report: AnomalyReport, claims: AuditedClaim[]): string {
+  const byId = new Map(claims.map((claim) => [claim.id, claim]));
+  const cell = (value: string | number | undefined) => {
+    const original = value === undefined ? "" : String(value);
+    const safe = /^[\s\u0000-\u001f]*[=+@-]/.test(original) ? "'" + original : original;
+    return '"' + safe.replace(/"/g, '""') + '"';
+  };
+  const rows: (string | number | undefined)[][] = [[
+    "claimId", "employeeId", "merchant", "department", "category", "date",
+    "amount", "currency", "reviewPriority", "screeningScore", "signalCodes",
+    "signalExplanations", "relatedClaimIds",
+  ]];
+  for (const item of report.items) {
+    const claim = byId.get(item.claimId);
+    if (!claim) continue;
+    rows.push([
+      claim.id, claim.employeeId, claim.merchant, claim.department, claim.category,
+      claim.date, claim.amount, claim.currency, item.priority, item.score,
+      item.signals.map((signal) => signal.code).join(" | "),
+      item.signals.map((signal) => signal.explanation).join(" | "),
+      [...new Set(item.signals.flatMap((signal) => signal.relatedIds))].join(" | "),
+    ]);
+  }
+  return "\uFEFF" + rows.map((row) => row.map(cell).join(",")).join("\r\n") + "\r\n";
+}
