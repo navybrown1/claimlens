@@ -418,6 +418,7 @@ export default function App() {
   const base = workspace.policy.baseCurrency;
   const baseClaims = audited.filter((c) => c.currency === base);
   const total = baseClaims.reduce((n, c) => n + c.amount, 0);
+  const creditCount = baseClaims.filter((c) => c.amount < 0).length;
   const hold = audited.filter((c) => c.status === "hold");
   const fixes = audited.filter((c) => c.status === "fix");
   const clear = audited.filter((c) => c.status === "clear");
@@ -1389,9 +1390,9 @@ export default function App() {
               </div>
               <div className="metric-grid">
                 <Metric
-                  title="Total claimed"
+                  title="Net claimed"
                   value={currencyText(total, base)}
-                  note={`${baseClaims.length} claims in ${base}${baseClaims.length !== audited.length ? ` · ${audited.length - baseClaims.length} other currency` : ""}`}
+                  note={`${baseClaims.length} records in ${base}${creditCount ? ` · ${creditCount} credit adjustments` : ""}${baseClaims.length !== audited.length ? ` · ${audited.length - baseClaims.length} other currency` : ""}`}
                   icon={<Wallet size={20} />}
                   color="green"
                 />
